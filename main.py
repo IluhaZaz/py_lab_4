@@ -1,9 +1,8 @@
-import os
-
-
 import numpy as np
 import pandas as pd
-import matplotlib
+import matplotlib.pyplot as plt
+from nltk.stem.snowball import SnowballStemmer
+from nltk.tokenize import word_tokenize
 
 
 PATH_TO_ANNOTATION = "c:\\Users\\Acer\\Documents\\py_lab_2\\annotations_1.csv"
@@ -32,10 +31,50 @@ def sort_dataframe_by_word_count(df: pd.DataFrame, count: int) -> pd.DataFrame:
 
 
 def sort_dataframe_by_mark(df: pd.DataFrame, mark: str) -> pd.DataFrame:
-    return df.loc[mark]
+    return df[df["Тип рецензии"] == mark]
+
+
+def stats_for_marks(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.drop('Текст рецензии', axis=1)
+    df = df.groupby('Тип рецензии')
+
+    df_max = df.max().values.tolist()
+    df_min = df.min().values.tolist()
+    df_mean = df.mean().values.tolist()
+
+    df_max = sum(df_max, [])
+    df_min = sum(df_min, [])
+    df_mean = sum(df_mean, [])
+
+    result = pd.DataFrame({'Тип рецензии': ['bad', 'good']})
+    result["max"] = df_max
+    result["min"] = df_min
+    result["mean"] = df_mean
+    
+    return result
+
+
+def get_hist(df: pd.DataFrame, mark: str) -> pd.DataFrame:
+    stemmer = SnowballStemmer("russian")
+    res = {}
+    for text in df[df["Тип рецензии"] == mark]['Текст рецензии']:
+        tokens = word_tokenize(text)
+        lemmatized_words = [stemmer.stem(word) for word in tokens]
+        list_to_dict(lemmatized_words, res)
+    return pd.DataFrame(res, index=[0])
+
+
+def list_to_dict(a: list, b: dict) -> dict:
+    for i in a:
+        if i in b.keys():
+            b[i] +=1
+        else:
+            b[i] =1
+    return b
+
 
 
 if __name__ == "__main__":
+    
     df = create_dataframe(PATH_TO_ANNOTATION)
-    df = sort_dataframe_by_mark(df, "1+1")
-    print(df)
+    print(get_hist(df, "good"))
