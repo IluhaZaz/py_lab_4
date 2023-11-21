@@ -11,6 +11,8 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from pymystem3 import Mystem
 from progress.bar import IncrementalBar
+import multiprocessing
+
 
 
 
@@ -94,32 +96,37 @@ def get_hist(df: pd.DataFrame, mark: str, n: int) -> pd.DataFrame:
 
 def get_hist2(df: pd.DataFrame, mark: str, n: int) -> pd.Series:
     m = Mystem()
-    d = FreqDist()
+    
 
     nlp = spacy.load("ru_core_news_md")
     stopwords_ru = stopwords.words("russian")
-    stopwords_ru += df.index.to_list()
-    stopwords_ru += ['серия', 'фильм', 'сезон', 'сериал', 'который']
+    stopwords_ru += ['серия', 'фильм', 'сезон', 'сериал', 'который', 'первый', "второй", "персонаж", " ", '  ']
     stopwords_ru += list(nlp.Defaults.stop_words)
+    stopwords_ru += [word.lower() for word in df.index]
     stopwords_ru = list(set(stopwords_ru))
+    
 
-    bar = IncrementalBar('Progress', max = round(len(df.index)/2))
+    data = sort_dataframe_by_mark(df, mark)['Текст рецензии']
+    with multiprocessing.Manager() as manager:
+        d = manager.dict()
+        p = multiprocessing.Pool(8)
+        p.starmap_async(process, [(text, m, stopwords_ru, d, n, nlp) for text in data])
+        p.close()
+        p.join()
+        return pd.Series(dict(dict_to_FreqDist(d).most_common(n)))
 
-    for text in sort_dataframe_by_mark(df, mark)['Текст рецензии']:
-
-        bar.next()
-
-        text = del_trash(text)
-
-        l = [word for word in m.lemmatize(text) if word not in stopwords_ru + [" ", '  ']]
-        d = merge(d, FreqDist(nltk.Text(l)))
-        d = dict_to_FreqDist(dict(d.most_common(round(n))))
-    bar.finish()
-    return pd.Series(dict(d.most_common(n)))
+def process(text: str, m: Mystem, stopwords_ru: list, d: dict, n: int, nlp) -> None:
+    text = del_trash(text)
+    l = [word for word in m.lemmatize(text) if (word not in stopwords_ru) and nlp(word)[0].pos_ not in ["VERB", "NOUN"]]
+    processed = FreqDist(nltk.Text(l)).most_common(n)
+    merge(d, dict(processed))
 
 
 def show_barh(df: pd.Series) -> None:
     plt.barh(df.index, df.values)
+    plt.xlabel("Количество встреченных слов")
+    plt.ylabel("Самые часто используемые слова")
+    plt.title("Частотный анализ слов из рецензий")
     plt.show()
 
 
@@ -140,16 +147,12 @@ def del_trash(text: str) -> str:
     return res
 
 
-def merge(a: FreqDist, b: FreqDist) -> FreqDist:
-    c = FreqDist()
-    for key, value in a.items():
-        c[key] = value
+def merge(a: dict, b: FreqDist) -> None:
     for key, value in b.items():
         if key in a.keys():
-            c[key] += value
+            a[key] += value
         else:
-            c[key] = value
-    return c
+            a[key] = value
 
 
 def dict_to_FreqDist(a: dict) -> FreqDist:
@@ -158,8 +161,8 @@ def dict_to_FreqDist(a: dict) -> FreqDist:
         b[key] = value
     return b
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     df = create_dataframe(PATH_TO_ANNOTATION)
-    df = get_hist2(df, "good", 65) 
+    df = get_hist2(df, "bad", 65) 
     show_barh(df)
