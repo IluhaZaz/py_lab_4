@@ -1,23 +1,14 @@
-import string
-
-
 import spacy
 import pandas as pd
 import matplotlib.pyplot as plt
 from nltk.probability import FreqDist
 import nltk
-from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
 from pymystem3 import Mystem
-from progress.bar import IncrementalBar
 import multiprocessing
 
 
-
-
-TRASH_LIST = [x for x in string.punctuation + string.digits]
-TRASH_LIST += ["\n", "«", "»", '“', '”', '—', '-', '–']
+ALF = [x for x in "абвгдеёжзийклмнопрстуфхцчшщъыьэюя "]
 
 
 PATH_TO_ANNOTATION = "c:\\Users\\Acer\\Documents\\py_lab_2\\annotations_1.csv"
@@ -39,7 +30,7 @@ def create_dataframe(annotation_path: str) -> pd.DataFrame:
 
 
 def get_static_info(df: pd.DataFrame) -> pd.DataFrame:
-    return df.describe()
+    return df["Количество слов"].describe()
 
 
 def sort_dataframe_by_word_count(df: pd.DataFrame, count: int) -> pd.DataFrame:
@@ -70,31 +61,8 @@ def stats_for_marks(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def get_hist(df: pd.DataFrame, mark: str, n: int) -> pd.DataFrame:
-    stemmer = SnowballStemmer("russian")
-    list = []
-    
-    nlp = spacy.load("ru_core_news_md")
-    stopwords_ru = stopwords.words("russian")
-    stopwords_ru += df.index.to_list()
-    stopwords_ru += ['серия', 'фильм', 'сезон', 'сериал', 'который']
-    stopwords_ru += list(nlp.Defaults.stop_words)
-    stopwords_ru = list(set(stopwords_ru))
 
-    bar = IncrementalBar('Progress', max = round(len(df.index)/2))
-
-    for text in sort_dataframe_by_mark(df, mark)['Текст рецензии']:
-        bar.next()
-        tokens = word_tokenize(text)
-        lemmatized_words = [stemmer.stem(word) for word in tokens if word not in stopwords_ru and word not in string.punctuation + "«»–..."]
-        list += lemmatized_words
-    list = nltk.Text(list)
-    bar.finish()
-    return pd.Series(dict(FreqDist(list).most_common(n)))
-
-
-
-def get_hist2(df: pd.DataFrame, mark: str, n: int) -> pd.Series:
+def get_hist(df: pd.DataFrame, mark: str, n: int) -> pd.Series:
     m = Mystem()
     
 
@@ -142,7 +110,7 @@ def list_to_dict(a: list, b: dict) -> dict:
 def del_trash(text: str) -> str:
     res = ''
     for i in text:
-        if i not in TRASH_LIST:
+        if i in ALF:
             res += i
     return res
 
@@ -164,5 +132,6 @@ def dict_to_FreqDist(a: dict) -> FreqDist:
 
 if __name__ == "__main__":
     df = create_dataframe(PATH_TO_ANNOTATION)
-    df = get_hist2(df, "bad", 65) 
+    print(get_static_info(df))
+    df = get_hist(df, "bad", 65) 
     show_barh(df)
