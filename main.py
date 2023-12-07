@@ -1,20 +1,22 @@
 import spacy
 import pandas as pd
 import matplotlib.pyplot as plt
-from nltk.probability import FreqDist
 import nltk
-from nltk.corpus import stopwords
-from pymystem3 import Mystem
 import multiprocessing
 
 
-ALF = [x for x in "абвгдеёжзийклмнопрстуфхцчшщъыьэюя "]
+from nltk.corpus import stopwords
+from pymystem3 import Mystem
+from nltk.probability import FreqDist
 
 
 PATH_TO_ANNOTATION = "c:\\Users\\Acer\\Documents\\py_lab_2\\annotations_1.csv"
 
 
 def create_dataframe(annotation_path: str) -> pd.DataFrame:
+
+    """Создает датафрейм по аннотации"""
+
     df = pd.DataFrame(columns=["Тип рецензии", "Текст рецензии", "Количество слов"])
     with open(annotation_path, mode="r", encoding="utf-8") as ann:
         for line in ann.readlines():
@@ -30,18 +32,30 @@ def create_dataframe(annotation_path: str) -> pd.DataFrame:
 
 
 def get_static_info(df: pd.DataFrame) -> pd.DataFrame:
+
+    """Выводит статистику по численным полям датафрейму"""
+
     return df["Количество слов"].describe()
 
 
 def sort_dataframe_by_word_count(df: pd.DataFrame, count: int) -> pd.DataFrame:
+
+    """Сортирует датафрейм по количеству слов"""
+
     return df[df["Количество слов"] <= count]
 
 
 def sort_dataframe_by_mark(df: pd.DataFrame, mark: str) -> pd.DataFrame:
+
+    """Сортирует датафрейм по метке"""
+
     return df[df["Тип рецензии"] == mark]
 
 
 def stats_for_marks(df: pd.DataFrame) -> pd.DataFrame:
+
+    """Выводит статистику по типу рецензии по датафрейму"""
+
     df = df.drop('Текст рецензии', axis=1)
     df = df.groupby('Тип рецензии')
 
@@ -63,12 +77,15 @@ def stats_for_marks(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_hist(df: pd.DataFrame, mark: str, n: int) -> pd.Series:
+
+    """Создает серию для построения датафрейма"""
+
     m = Mystem()
     
 
     nlp = spacy.load("ru_core_news_md")
     stopwords_ru = stopwords.words("russian")
-    stopwords_ru += ['серия', 'фильм', 'сезон', 'сериал', 'который', 'первый', "второй", "персонаж", " ", '  ']
+    stopwords_ru += ['серия', 'фильм', 'сезон', 'сериал', 'который', 'первый', "второй", "персонаж", " ", '  ', '   ']
     stopwords_ru += list(nlp.Defaults.stop_words)
     stopwords_ru += [word.lower() for word in df.index]
     stopwords_ru = list(set(stopwords_ru))
@@ -83,6 +100,7 @@ def get_hist(df: pd.DataFrame, mark: str, n: int) -> pd.Series:
         p.join()
         return pd.Series(dict(dict_to_FreqDist(d).most_common(n)))
 
+
 def process(text: str, m: Mystem, stopwords_ru: list, d: dict, n: int, nlp) -> None:
     text = del_trash(text)
     l = [word for word in m.lemmatize(text) if (word not in stopwords_ru) and nlp(word)[0].pos_ not in ["VERB", "NOUN"]]
@@ -91,6 +109,9 @@ def process(text: str, m: Mystem, stopwords_ru: list, d: dict, n: int, nlp) -> N
 
 
 def show_barh(df: pd.Series) -> None:
+
+    """Показывает гистограмму"""
+
     plt.barh(df.index, df.values)
     plt.xlabel("Количество встреченных слов")
     plt.ylabel("Самые часто используемые слова")
@@ -99,6 +120,9 @@ def show_barh(df: pd.Series) -> None:
 
 
 def list_to_dict(a: list, b: dict) -> dict:
+
+    """Преобразует список в словарь"""
+
     for i in a:
         if i in b.keys():
             b[i] +=1
@@ -108,6 +132,11 @@ def list_to_dict(a: list, b: dict) -> dict:
 
 
 def del_trash(text: str) -> str:
+
+    ALF = [x for x in "абвгдеёжзийклмнопрстуфхцчшщъыьэюя " + "абвгдеёжзийклмнопрстуфхцчшщъыьэюя".upper()]
+
+    """Удаляет все небуквенные значения из текста"""
+
     res = ''
     for i in text:
         if i in ALF:
@@ -116,6 +145,9 @@ def del_trash(text: str) -> str:
 
 
 def merge(a: dict, b: FreqDist) -> None:
+
+    """Выполняет слияние словаря и частотного словаря"""
+
     for key, value in b.items():
         if key in a.keys():
             a[key] += value
@@ -124,6 +156,9 @@ def merge(a: dict, b: FreqDist) -> None:
 
 
 def dict_to_FreqDist(a: dict) -> FreqDist:
+
+    """Выполняет слияние словаря с частотным словарем"""
+
     b = FreqDist()
     for key, value in a.items():
         b[key] = value
@@ -132,6 +167,5 @@ def dict_to_FreqDist(a: dict) -> FreqDist:
 
 if __name__ == "__main__":
     df = create_dataframe(PATH_TO_ANNOTATION)
-    print(get_static_info(df))
-    df = get_hist(df, "bad", 65) 
+    df = get_hist(df, "good", 25) 
     show_barh(df)
